@@ -3,10 +3,12 @@
 
 aclocal.m4
 autom4te.cache/
+config.h.in
 configure
 depcomp
 install-sh
 missing
+compile
 
 # configure by-products
 .deps/
@@ -17,10 +19,11 @@ version.h
 
 # build by-products
 *.o
-
-gsmmap
+*.a
 
 # various
+*.sw?
+*.deps
 .version
 .tarball-version
 
@@ -31,5 +34,6 @@ gsmmap
 
 # Other test files
 *.dump
+*.coff
 *.bin
 *.log

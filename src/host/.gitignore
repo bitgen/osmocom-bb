@@ -1,0 +1,13 @@
+# final executables
+osmocon/osmocon
+osmocon/osmoload
+gsmmap/gsmmap
+
+layer23/src/misc/bcch_scan
+layer23/src/misc/cbch_sniff
+layer23/src/misc/cell_log
+layer23/src/misc/echo_test
+layer23/src/misc/cbch_sniff
+layer23/src/misc/ccch_scan
+layer23/src/misc/layer23
+layer23/src/mobile/mobile

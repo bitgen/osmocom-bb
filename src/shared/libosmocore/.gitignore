@@ -81,7 +81,7 @@ doc/html.tar
 
 src/crc*gen.c
 include/osmocom/core/crc*gen.h
-
+build-target
 
 # vi files
 *.sw?
