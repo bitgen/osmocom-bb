@@ -20,6 +20,14 @@ So, I think there is a way to bring a new live to OsmocomBB project. We can make
 + More flexible voice routing
 + GPRS and EDGE support
 + Multi SIM support
-+ ...
 
 Any help and contributions are welcome!
+
+## The road map (draft)
+
+1. Implement UDP connection between both osmo-trx and trxcon
+2. Clock indication (debug print only for now)
+3. CTRL commands implementation
+4. GSM L1 implementation (TS 05.03)
+5. OsmoBTS scheduler integration
+6. The '/tmp/osmocom_l2' socket handlers
