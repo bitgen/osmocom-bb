@@ -36,6 +36,7 @@
 #include <osmocom/core/application.h>
 
 #include "logging.h"
+#include "l1ctl_link.h"
 
 #define COPYRIGHT \
 	"Copyright (C) 2016 by Vadim Yanitskiy <axilirator@gmail.com>\n" \
@@ -147,6 +148,7 @@ static void signal_handler(int signal)
 
 int main(int argc, char **argv)
 {
+	struct l1ctl_link *l1l = NULL;
 	void *tall_msgb_ctx;
 	int rc = 0;
 
@@ -168,10 +170,14 @@ int main(int argc, char **argv)
 	// Init logging system
 	trx_log_init(NULL);
 
-	// Currently nothing to do
-	print_usage(argv[0]);
-	print_help();
-	exit(0);
+	// Test L1CTL server
+	rc = l1ctl_link_init(&l1l, app_data.bind_socket);
+	if (rc) {
+		// TODO: goto init error
+		return rc;
+	}
+
+	LOGP(DAPP, LOGL_NOTICE, "Init complete\n");
 
 	if (app_data.daemonize) {
 		rc = osmo_daemonize();
@@ -186,5 +192,10 @@ int main(int argc, char **argv)
 	}
 
 	// TODO: close active connections
+	l1ctl_link_shutdown(l1l);
+
+	// TMP: memory leaks detection
+	talloc_report_full(tall_trx_ctx, stderr);
+
 	return rc;
 }
