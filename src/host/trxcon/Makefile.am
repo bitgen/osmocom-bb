@@ -8,9 +8,9 @@ dist-hook:
 	echo $(VERSION) > $(distdir)/.tarball-version
 
 AM_CPPFLAGS = $(all_includes) -I$(top_srcdir)/include
-AM_CFLAGS = -Wall $(LIBOSMOCORE_CFLAGS)
+AM_CFLAGS = -Wall $(LIBOSMOCORE_CFLAGS) $(LIBOSMOGSM_CFLAGS)
 
 sbin_PROGRAMS = trxcon
 
-trxcon_SOURCES = logging.c l1ctl_link.c trxcon.c
-trxcon_LDADD = $(LIBOSMOCORE_LIBS)
+trxcon_SOURCES = logging.c l1ctl_link.c trx_if.c trxcon.c
+trxcon_LDADD = $(LIBOSMOCORE_LIBS) $(LIBOSMOGSM_LIBS)

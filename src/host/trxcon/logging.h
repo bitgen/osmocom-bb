@@ -4,11 +4,12 @@
 #define DEBUG
 #include <osmocom/core/logging.h>
 
-#define DEBUG_DEFAULT "DAPP:DL1C"
+#define DEBUG_DEFAULT "DAPP:DL1C:DTRX"
 
 enum {
 	DAPP,
-	DL1C
+	DL1C,
+	DTRX
 };
 
 extern const struct log_info trx_log_info;

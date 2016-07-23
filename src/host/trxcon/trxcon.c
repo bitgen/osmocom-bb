@@ -35,6 +35,7 @@
 #include <osmocom/core/select.h>
 #include <osmocom/core/application.h>
 
+#include "trx_if.h"
 #include "logging.h"
 #include "l1ctl_link.h"
 
@@ -148,6 +149,7 @@ static void signal_handler(int signal)
 
 int main(int argc, char **argv)
 {
+	struct trx_instance *trx = NULL;
 	struct l1ctl_link *l1l = NULL;
 	void *tall_msgb_ctx;
 	int rc = 0;
@@ -170,12 +172,15 @@ int main(int argc, char **argv)
 	// Init logging system
 	trx_log_init(NULL);
 
-	// Test L1CTL server
+	// Init L1CTL server
 	rc = l1ctl_link_init(&l1l, app_data.bind_socket);
-	if (rc) {
-		// TODO: goto init error
-		return rc;
-	}
+	if (rc)
+		goto init_error;
+
+	// Init transceiver interface
+	rc = trx_if_open(&trx, app_data.trx_ip, app_data.trx_base_port);
+	if (rc)
+		goto init_error;
 
 	LOGP(DAPP, LOGL_NOTICE, "Init complete\n");
 
@@ -193,9 +198,14 @@ int main(int argc, char **argv)
 
 	// TODO: close active connections
 	l1ctl_link_shutdown(l1l);
+	trx_if_close(trx);
 
 	// TMP: memory leaks detection
 	talloc_report_full(tall_trx_ctx, stderr);
 
-	return rc;
+	return 0;
+
+init_error:
+	talloc_free(tall_trx_ctx);
+	return -1;
 }
