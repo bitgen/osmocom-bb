@@ -12,5 +12,5 @@ AM_CFLAGS = -Wall $(LIBOSMOCORE_CFLAGS) $(LIBOSMOGSM_CFLAGS)
 
 sbin_PROGRAMS = trxcon
 
-trxcon_SOURCES = logging.c l1ctl_link.c trx_if.c trxcon.c
+trxcon_SOURCES = logging.c l1ctl_link.c l1ctl.c trx_if.c trxcon.c
 trxcon_LDADD = $(LIBOSMOCORE_LIBS) $(LIBOSMOGSM_LIBS)

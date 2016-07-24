@@ -3,6 +3,7 @@
 
 #include "trx_if.h"
 #include "l1ctl_link.h"
+#include "l1ctl.h"
 
 struct app_data_t {
 	struct trx_instance *trx;

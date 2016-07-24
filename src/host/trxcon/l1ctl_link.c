@@ -2,6 +2,7 @@
  * OsmocomBB <-> OsmoTRX connection bridge
  * GSM L2 socket (/tmp/osmocom_l2) handlers
  *
+ * (C) 2013 by Sylvain Munaut <tnt@246tNt.com>
  * (C) 2016 by Vadim Yanitskiy <axilirator@gmail.com>
  *
  * All Rights Reserved
@@ -83,10 +84,8 @@ static int l1ctl_link_read_cb(struct osmo_fd *bfd)
 		return rc;
 	}
 
-	// FIXME: struct l1ctl_link has no member 'cb'
-	// return l1l->cb(l1l->cb_data, msg);
-	LOGP(DL1C, LOGL_NOTICE, "RX DATA\n");
-	msgb_free(msg);
+	// Forward msg to L1CTL handlers
+	l1ctl_rx_cb(msg);
 
 	return 0;
 }
@@ -175,9 +174,6 @@ int l1ctl_link_close_conn(struct l1ctl_link *l1l)
 int l1ctl_link_send(struct l1ctl_link *l1l, struct msgb *msg)
 {
 	uint16_t *len;
-
-	// TMP: debug print
-	printf("Sending: '%s'\n", osmo_hexdump(msg->data, msg->len));
 
 	if (msg->l1h != msg->data)
 		LOGP(DL1C, LOGL_NOTICE, "Message L1 header != Message Data\n");
