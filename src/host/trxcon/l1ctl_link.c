@@ -43,25 +43,6 @@
 
 extern void *tall_trx_ctx;
 
-static int l1ctl_link_close_conn(struct l1ctl_link *l1l)
-{
-	struct osmo_fd *conn_bfd = &l1l->wq.bfd;
-
-	if (conn_bfd->fd <= 0)
-		return -EINVAL;
-
-	// Close connection socket
-	osmo_fd_unregister(conn_bfd);
-	close(conn_bfd->fd);
-	conn_bfd->fd = -1;
-
-	// Clear pending messages
-	osmo_wqueue_clear(&l1l->wq);
-
-	// TODO: switch the bridge to IDLE state
-	return 0;
-}
-
 static int l1ctl_link_read_cb(struct osmo_fd *bfd)
 {
 	struct l1ctl_link *l1l = (struct l1ctl_link *) bfd->data;
@@ -169,6 +150,48 @@ static int l1ctl_link_accept(struct osmo_fd *bfd, unsigned int flags)
 	LOGP(DL1C, LOGL_NOTICE, "L1CTL has a new connection\n");
 
 	// TODO: switch the bridge to CONNECTED state
+	return 0;
+}
+
+int l1ctl_link_close_conn(struct l1ctl_link *l1l)
+{
+	struct osmo_fd *conn_bfd = &l1l->wq.bfd;
+
+	if (conn_bfd->fd <= 0)
+		return -EINVAL;
+
+	// Close connection socket
+	osmo_fd_unregister(conn_bfd);
+	close(conn_bfd->fd);
+	conn_bfd->fd = -1;
+
+	// Clear pending messages
+	osmo_wqueue_clear(&l1l->wq);
+
+	// TODO: switch the bridge to IDLE state
+	return 0;
+}
+
+int l1ctl_link_send(struct l1ctl_link *l1l, struct msgb *msg)
+{
+	uint16_t *len;
+
+	// TMP: debug print
+	printf("Sending: '%s'\n", osmo_hexdump(msg->data, msg->len));
+
+	if (msg->l1h != msg->data)
+		LOGP(DL1C, LOGL_NOTICE, "Message L1 header != Message Data\n");
+
+	// Prepend 16-bit length before sending
+	len = (uint16_t *) msgb_push(msg, sizeof(*len));
+	*len = htons(msg->len - sizeof(*len));
+
+	if (osmo_wqueue_enqueue(&l1l->wq, msg) != 0) {
+		LOGP(DL1C, LOGL_ERROR, "Failed to enqueue msg!\n");
+		msgb_free(msg);
+		return -EIO;
+	}
+
 	return 0;
 }
 
