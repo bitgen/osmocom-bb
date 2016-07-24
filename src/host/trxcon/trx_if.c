@@ -361,6 +361,11 @@ int trx_if_cmd_txtune(struct trx_instance *trx, uint16_t arfcn)
 	return trx_ctrl_cmd(trx, 1, "TXTUNE", "%d", freq10 * 100);
 }
 
+int trx_if_cmd_sync(struct trx_instance *trx)
+{
+	return trx_ctrl_cmd(trx, 1, "SYNC", "");
+}
+
 /* Get response from CTRL socket */
 static int trx_ctrl_read_cb(struct osmo_fd *ofd, unsigned int what)
 {
