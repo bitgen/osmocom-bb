@@ -90,7 +90,7 @@ static void handle_options(int argc, char **argv)
 			exit(0);
 			break;
 		case 'd':
-			log_parse_category_mask(osmo_stderr_target, optarg);
+			app.debug_mask = optarg;
 			break;
 		case 'i':
 			app.trx_ip = optarg;
@@ -116,6 +116,7 @@ static void init_defaults(void)
 	app.trx_ip = "127.0.0.1";
 	app.trx_port = 5700;
 
+	app.debug_mask = NULL;
 	app.daemonize = 0;
 	app.quit = 0;
 }
@@ -159,7 +160,7 @@ int main(int argc, char **argv)
 	osmo_init_ignore_signals();
 
 	// Init logging system
-	trx_log_init(NULL);
+	trx_log_init(app.debug_mask);
 
 	// Init L1CTL server
 	rc = l1ctl_link_init(&app.l1l, app.l1l_socket);

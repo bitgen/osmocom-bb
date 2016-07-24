@@ -9,6 +9,7 @@ struct app_data_t {
 	struct trx_instance *trx;
 	struct l1ctl_link *l1l;
 
+	const char *debug_mask;
 	const char *l1l_socket;
 	const char *trx_ip;
 	uint16_t trx_port;
