@@ -38,7 +38,7 @@
 
 #include <osmocom/gsm/gsm_utils.h>
 
-#include "trx_if.h"
+#include "trxcon.h"
 #include "logging.h"
 
 extern void *tall_trx_ctx;

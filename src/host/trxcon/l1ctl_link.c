@@ -38,8 +38,8 @@
 #include <osmocom/core/socket.h>
 #include <osmocom/core/write_queue.h>
 
+#include "trxcon.h"
 #include "logging.h"
-#include "l1ctl_link.h"
 
 extern void *tall_trx_ctx;
 

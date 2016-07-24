@@ -35,9 +35,8 @@
 #include <osmocom/core/select.h>
 #include <osmocom/core/application.h>
 
-#include "trx_if.h"
+#include "trxcon.h"
 #include "logging.h"
-#include "l1ctl_link.h"
 
 #define COPYRIGHT \
 	"Copyright (C) 2016 by Vadim Yanitskiy <axilirator@gmail.com>\n" \
@@ -46,15 +45,7 @@
 	"This is free software: you are free to change and redistribute it.\n" \
 	"There is NO WARRANTY, to the extent permitted by law.\n\n"
 
-static struct {
-	int daemonize;
-	int quit;
-
-	const char *trx_ip;
-	const char *bind_socket;
-	uint16_t trx_base_port;
-} app_data;
-
+struct app_data_t app;
 void *tall_trx_ctx = NULL;
 
 static void print_usage(const char *app)
@@ -102,16 +93,16 @@ static void handle_options(int argc, char **argv)
 			log_parse_category_mask(osmo_stderr_target, optarg);
 			break;
 		case 'i':
-			app_data.trx_ip = optarg;
+			app.trx_ip = optarg;
 			break;
 		case 'p':
-			app_data.trx_base_port = atoi(optarg);
+			app.trx_port = atoi(optarg);
 			break;
 		case 's':
-			app_data.bind_socket = optarg;
+			app.l1l_socket = optarg;
 			break;
 		case 'D':
-			app_data.daemonize = 1;
+			app.daemonize = 1;
 			break;
 		default:
 			break;
@@ -121,12 +112,12 @@ static void handle_options(int argc, char **argv)
 
 static void init_defaults(void)
 {
-	app_data.bind_socket = "/tmp/osmocom_l2";
-	app_data.trx_ip = "127.0.0.1";
-	app_data.trx_base_port = 5700;
+	app.l1l_socket = "/tmp/osmocom_l2";
+	app.trx_ip = "127.0.0.1";
+	app.trx_port = 5700;
 
-	app_data.daemonize = 0;
-	app_data.quit = 0;
+	app.daemonize = 0;
+	app.quit = 0;
 }
 
 static void signal_handler(int signal)
@@ -135,7 +126,7 @@ static void signal_handler(int signal)
 
 	switch (signal) {
 	case SIGINT:
-		app_data.quit++;
+		app.quit++;
 		break;
 	case SIGABRT:
 	case SIGUSR1:
@@ -149,8 +140,6 @@ static void signal_handler(int signal)
 
 int main(int argc, char **argv)
 {
-	struct trx_instance *trx = NULL;
-	struct l1ctl_link *l1l = NULL;
 	void *tall_msgb_ctx;
 	int rc = 0;
 
@@ -173,18 +162,18 @@ int main(int argc, char **argv)
 	trx_log_init(NULL);
 
 	// Init L1CTL server
-	rc = l1ctl_link_init(&l1l, app_data.bind_socket);
+	rc = l1ctl_link_init(&app.l1l, app.l1l_socket);
 	if (rc)
 		goto init_error;
 
 	// Init transceiver interface
-	rc = trx_if_open(&trx, app_data.trx_ip, app_data.trx_base_port);
+	rc = trx_if_open(&app.trx, app.trx_ip, app.trx_port);
 	if (rc)
 		goto init_error;
 
 	LOGP(DAPP, LOGL_NOTICE, "Init complete\n");
 
-	if (app_data.daemonize) {
+	if (app.daemonize) {
 		rc = osmo_daemonize();
 		if (rc < 0) {
 			perror("Error during daemonize");
@@ -192,13 +181,13 @@ int main(int argc, char **argv)
 		}
 	}
 
-	while (!app_data.quit) {
+	while (!app.quit) {
 		osmo_select_main(0);
 	}
 
 	// TODO: close active connections
-	l1ctl_link_shutdown(l1l);
-	trx_if_close(trx);
+	l1ctl_link_shutdown(app.l1l);
+	trx_if_close(app.trx);
 
 	// TMP: memory leaks detection
 	talloc_report_full(tall_trx_ctx, stderr);
