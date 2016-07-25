@@ -29,10 +29,10 @@
 
 static struct log_info_cat trx_log_info_cat[] = {
 	[DAPP] = {
-		.name = "APP",
+		.name = "DAPP",
 		.description = "Application",
 		.color = "\033[1;35m",
-		.enabled = 1, .loglevel = LOGL_DEBUG,
+		.enabled = 1, .loglevel = LOGL_NOTICE,
 	},
 	[DL1C]	= {
 		.name = "DL1C",
