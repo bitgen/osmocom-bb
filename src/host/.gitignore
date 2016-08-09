@@ -1,6 +1,7 @@
 # final executables
 osmocon/osmocon
 osmocon/osmoload
+trxcon/trxcon
 gsmmap/gsmmap
 
 layer23/src/misc/bcch_scan
