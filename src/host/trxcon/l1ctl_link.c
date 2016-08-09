@@ -148,7 +148,9 @@ static int l1ctl_link_accept(struct osmo_fd *bfd, unsigned int flags)
 
 	LOGP(DL1C, LOGL_NOTICE, "L1CTL has a new connection\n");
 
-	// TODO: switch the bridge to CONNECTED state
+	// Notify application state/event manager
+	app_handle_event(APP_EVENT_L1C_CONNECT);
+
 	return 0;
 }
 
@@ -167,7 +169,9 @@ int l1ctl_link_close_conn(struct l1ctl_link *l1l)
 	// Clear pending messages
 	osmo_wqueue_clear(&l1l->wq);
 
-	// TODO: switch the bridge to IDLE state
+	// Notify application state/event manager
+	app_handle_event(APP_EVENT_L1C_DISCONNECT);
+
 	return 0;
 }
 

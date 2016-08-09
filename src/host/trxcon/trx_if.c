@@ -585,7 +585,7 @@ error:
 }
 
 /* Flush pending control messages */
-static void trx_if_flush_ctrl(struct trx_instance *trx)
+void trx_if_flush_ctrl(struct trx_instance *trx)
 {
 	struct trx_ctrl_msg *tcm;
 

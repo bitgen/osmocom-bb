@@ -139,6 +139,32 @@ static void signal_handler(int signal)
 	}
 }
 
+/* Application event manager */
+void app_handle_event(enum app_event_t event)
+{
+	switch (event) {
+	case APP_EVENT_L1C_CONNECT:
+		// Do something
+		// TODO: test TRX connection
+
+		LOGP(DAPP, LOGL_NOTICE, "Switched to MANAGED state\n");
+		app.state = APP_STATE_MANAGED;
+		break;
+	case APP_EVENT_L1C_DISCONNECT:
+		// Shut down transceiver
+		trx_if_flush_ctrl(app.trx);
+		trx_if_cmd_poweroff(app.trx);
+
+		LOGP(DAPP, LOGL_NOTICE, "Switched to IDLE state\n");
+		app.state = APP_STATE_IDLE;
+		break;
+	default:
+		LOGP(DAPP, LOGL_ERROR, "Couldn't handle an application event\n");
+		app.quit++;
+		break;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	void *tall_msgb_ctx;

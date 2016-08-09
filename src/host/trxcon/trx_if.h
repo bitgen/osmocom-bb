@@ -20,6 +20,7 @@ struct trx_ctrl_msg {
 };
 
 void trx_if_close(struct trx_instance *trx);
+void trx_if_flush_ctrl(struct trx_instance *trx);
 int trx_if_open(struct trx_instance **trx, const char *host, uint16_t port);
 
 int trx_if_cmd_poweron(struct trx_instance *trx);
