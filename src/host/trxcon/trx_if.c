@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <limits.h>
 
 #include <netinet/in.h>
 
@@ -182,7 +183,8 @@ static void trx_ctrl_send(struct trx_instance *trx)
 	tcm = llist_entry(trx->trx_ctrl_list.next, struct trx_ctrl_msg, list);
 
 	// Send command
-	LOGP(DTRX, LOGL_DEBUG, "Sending control '%s'\n", tcm->cmd);
+	LOGP(DTRX, LOGL_DEBUG, "Sending control #%u: '%s'\n",
+		tcm->cmd_id, tcm->cmd);
 	send(trx->trx_ofd_ctrl.fd, tcm->cmd, strlen(tcm->cmd) + 1, 0);
 
 	// Start expire timer
@@ -220,6 +222,13 @@ static int trx_ctrl_cmd(struct trx_instance *trx, int critical,
 	tcm = talloc_zero(tall_trx_ctx, struct trx_ctrl_msg);
 	if (!tcm)
 		return -ENOMEM;
+
+	// We aren't going to overflow anything, right?
+	if (trx->cmd_id_counter == UINT_MAX)
+		trx->cmd_id_counter = 0;
+
+	// Generate unique command ID
+	tcm->cmd_id = trx->cmd_id_counter++;
 
 	// Fill in cmd arguments
 	if (fmt && fmt[0]) {
@@ -366,6 +375,21 @@ int trx_if_cmd_sync(struct trx_instance *trx)
 	return trx_ctrl_cmd(trx, 1, "SYNC", "");
 }
 
+int trx_ctrl_set_cb(struct trx_instance *trx, trx_ctrl_cb_t *cb)
+{
+	if (trx->cb_enabled) {
+		LOGP(DTRX, LOGL_ERROR, "WTF?! CTRL command callback already set.\n");
+		// TODO: send the 'implementation error' event
+		return -1;
+	}
+
+	trx->cb_cmd_id = trx->cmd_id_counter;
+	trx->cb_enabled = 1;
+	trx->cb = cb;
+
+	return 0;
+}
+
 /* Get response from CTRL socket */
 static int trx_ctrl_read_cb(struct osmo_fd *ofd, unsigned int what)
 {
@@ -410,18 +434,23 @@ static int trx_ctrl_read_cb(struct osmo_fd *ofd, unsigned int what)
 			goto rsp_error;
 		}
 
-		// Check for response code
+		// Parse response code
 		sscanf(p + 1, "%d", &resp);
+
+		// Call the response callback, if it is required
+		if (trx->cb_enabled && trx->cb_cmd_id == tcm->cmd_id) {
+			trx->cb(resp, tcm);
+			trx->cb_enabled = 0;
+		}
+
+		// Check for response code
 		if (resp) {
 			LOGP(DTRX, (tcm->critical) ? LOGL_FATAL : LOGL_NOTICE,
 				"Transceiver rejected TRX command with "
-				"response: '%s'\n", buf);
-rsp_error:
-			if (tcm->critical) {
-				// TODO: stop/freeze trxcon process
-				// bts_shutdown(l1h->trx->bts, "SIGINT");
-				return -EIO;
-			}
+				"response: '%d'\n", resp);
+
+			if (tcm->critical)
+				goto rsp_error;
 		}
 
 		// Remove command from list
@@ -434,6 +463,11 @@ rsp_error:
 	}
 
 	return 0;
+
+rsp_error:
+	// TODO: stop/freeze trxcon process
+	// bts_shutdown(l1h->trx->bts, "SIGINT");
+	return -EIO;
 }
 
 /* ------------------------------------------------------------------------ */
