@@ -11,8 +11,19 @@ struct trx_ctrl_msg {
 	int cmd_len;
 };
 
-typedef void (trx_ctrl_cb_t)
-	(int response, struct trx_ctrl_msg *msg);
+struct trx_instance;
+
+/* CTRL response callback definition */
+typedef void (trx_ctrl_resp_cb_def)
+	(int resp, struct trx_instance *trx, void *data);
+
+/* CTRL response callback wrapper */
+struct trx_ctrl_resp_cb {
+	trx_ctrl_resp_cb_def *cb;
+	struct llist_head list;
+	unsigned int cmd_id;
+	void *data;
+};
 
 struct trx_instance {
 	struct osmo_fd trx_ofd_clck;
@@ -20,22 +31,19 @@ struct trx_instance {
 	struct osmo_fd trx_ofd_data;
 
 	struct osmo_timer_list trx_ctrl_timer;
+	struct llist_head trx_ctrl_resp_cb_list;
 	struct llist_head trx_ctrl_list;
 
 	// This counter is used for unique command ID generation
 	unsigned int cmd_id_counter;
-
-	// This callback is called as soon as transceiver responds
-	unsigned int cb_cmd_id;
-	trx_ctrl_cb_t *cb;
-	int cb_enabled;
 };
 
 void trx_if_close(struct trx_instance *trx);
 int trx_if_open(struct trx_instance **trx, const char *host, uint16_t port);
 
 void trx_if_flush_ctrl(struct trx_instance *trx);
-int trx_ctrl_set_cb(struct trx_instance *trx, trx_ctrl_cb_t *cb);
+int trx_ctrl_set_resp_cb(struct trx_instance *trx,
+	trx_ctrl_resp_cb_def *cb, void *data);
 
 int trx_if_cmd_poweron(struct trx_instance *trx);
 int trx_if_cmd_poweroff(struct trx_instance *trx);

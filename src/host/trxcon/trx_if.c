@@ -375,17 +375,23 @@ int trx_if_cmd_sync(struct trx_instance *trx)
 	return trx_ctrl_cmd(trx, 1, "SYNC", "");
 }
 
-int trx_ctrl_set_cb(struct trx_instance *trx, trx_ctrl_cb_t *cb)
+int trx_ctrl_set_resp_cb(struct trx_instance *trx,
+	trx_ctrl_resp_cb_def *cb, void *data)
 {
-	if (trx->cb_enabled) {
-		LOGP(DTRX, LOGL_ERROR, "WTF?! CTRL command callback already set.\n");
-		// TODO: send the 'implementation error' event
-		return -1;
+	struct trx_ctrl_resp_cb *new_cb;
+
+	// Try to allocate a new callback wrapper
+	new_cb = talloc_zero(trx, struct trx_ctrl_resp_cb);
+	if (!new_cb) {
+		fprintf(stderr, "Failed to allocate memory\n");
+		return -ENOMEM;
 	}
 
-	trx->cb_cmd_id = trx->cmd_id_counter;
-	trx->cb_enabled = 1;
-	trx->cb = cb;
+	// Register this one
+	llist_add_tail(&new_cb->list, &trx->trx_ctrl_resp_cb_list);
+	new_cb->cmd_id = trx->cmd_id_counter; // For the further command
+	new_cb->data = data;
+	new_cb->cb = cb;
 
 	return 0;
 }
@@ -394,8 +400,10 @@ int trx_ctrl_set_cb(struct trx_instance *trx, trx_ctrl_cb_t *cb)
 static int trx_ctrl_read_cb(struct osmo_fd *ofd, unsigned int what)
 {
 	struct trx_instance *trx = ofd->data;
+	struct trx_ctrl_resp_cb *cb;
 	char buf[1500];
 	int len, resp;
+	int cmd_match;
 
 	len = recv(ofd->fd, buf, sizeof(buf) - 1, 0);
 	if (len <= 0)
@@ -427,7 +435,8 @@ static int trx_ctrl_read_cb(struct osmo_fd *ofd, unsigned int what)
 			struct trx_ctrl_msg, list);
 
 		// Check if response matches command
-		if (rsp_len != tcm->cmd_len || !!strncmp(buf + 4, tcm->cmd + 4, rsp_len)) {
+		cmd_match = !!strncmp(buf + 4, tcm->cmd + 4, rsp_len);
+		if (rsp_len != tcm->cmd_len || cmd_match) {
 			LOGP(DTRX, (tcm->critical) ? LOGL_FATAL : LOGL_NOTICE,
 				"Response message '%s' does not match command "
 				"message '%s'\n", buf, tcm->cmd);
@@ -437,10 +446,17 @@ static int trx_ctrl_read_cb(struct osmo_fd *ofd, unsigned int what)
 		// Parse response code
 		sscanf(p + 1, "%d", &resp);
 
-		// Call the response callback, if it is required
-		if (trx->cb_enabled && trx->cb_cmd_id == tcm->cmd_id) {
-			trx->cb(resp, tcm);
-			trx->cb_enabled = 0;
+		// Call the response callback(s), if there is at least one
+		while (!llist_empty(&trx->trx_ctrl_resp_cb_list)) {
+			cb = llist_entry(trx->trx_ctrl_resp_cb_list.next,
+				struct trx_ctrl_resp_cb, list);
+
+			// Check if command ID matches
+			if (cb->cmd_id == tcm->cmd_id) {
+				cb->cb(resp, trx, cb->data);
+				llist_del(&cb->list);
+				talloc_free(cb);
+			}
 		}
 
 		// Check for response code
@@ -589,8 +605,11 @@ int trx_if_open(struct trx_instance **trx, const char *host, uint16_t port)
 		return -ENOMEM;
 	}
 
-	// Initialize CTRL queue
+	// Initialize CTRL commands queue
 	INIT_LLIST_HEAD(&trx_new->trx_ctrl_list);
+
+	// Initialize CTRL callbacks queue
+	INIT_LLIST_HEAD(&trx_new->trx_ctrl_resp_cb_list);
 
 	// Open sockets
 	rc = trx_udp_open(trx_new, &trx_new->trx_ofd_clck, host,
