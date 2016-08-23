@@ -156,7 +156,6 @@ static int l1ctl_rx_fbsb_req(struct msgb *msg)
 	rc += trx_if_cmd_txtune(app.trx, band_arfcn);
 	rc += trx_if_cmd_rxtune(app.trx, band_arfcn);
 	rc += trx_if_cmd_poweron(app.trx);
-	rc += trx_if_cmd_sync(app.trx);
 
 exit:
 	msgb_free(msg);
