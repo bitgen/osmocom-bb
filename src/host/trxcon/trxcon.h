@@ -12,7 +12,9 @@ enum app_state_t {
 
 enum app_event_t {
 	APP_EVENT_L1C_CONNECT,
-	APP_EVENT_L1C_DISCONNECT
+	APP_EVENT_L1C_DISCONNECT,
+	APP_EVENT_TRX_DISCONNECT,
+	APP_EVENT_TRX_RESP_ERROR
 };
 
 struct app_data_t {

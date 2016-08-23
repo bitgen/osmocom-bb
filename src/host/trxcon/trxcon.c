@@ -144,8 +144,9 @@ void app_handle_event(enum app_event_t event)
 {
 	switch (event) {
 	case APP_EVENT_L1C_CONNECT:
-		// Do something
-		// TODO: test TRX connection
+		// Perform a simple availability test
+		LOGP(DTRX, LOGL_DEBUG, "Performing availability check...\n");
+		trx_if_cmd_echo(app.trx);
 
 		LOGP(DAPP, LOGL_NOTICE, "Switched to MANAGED state\n");
 		app.state = APP_STATE_MANAGED;
@@ -157,6 +158,19 @@ void app_handle_event(enum app_event_t event)
 
 		LOGP(DAPP, LOGL_NOTICE, "Switched to IDLE state\n");
 		app.state = APP_STATE_IDLE;
+		break;
+	case APP_EVENT_TRX_DISCONNECT:
+		// FIXME: And, what to do now?
+		// Wait until transceiver resume
+		// or shutdown everything and exit?
+		app.quit++;
+		break;
+	case APP_EVENT_TRX_RESP_ERROR:
+		// Shut down transceiver
+		trx_if_flush_ctrl(app.trx);
+		trx_if_cmd_poweroff(app.trx);
+
+		app.quit++;
 		break;
 	default:
 		LOGP(DAPP, LOGL_ERROR, "Couldn't handle an application event\n");

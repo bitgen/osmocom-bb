@@ -197,6 +197,7 @@ static void trx_ctrl_timer_cb(void *data)
 {
 	LOGP(DTRX, LOGL_NOTICE, "No response from transceiver...\n");
 
+	// TODO: count lost responses here
 	// Attempt to send a command again
 	trx_ctrl_send((struct trx_instance *) data);
 }
@@ -209,11 +210,11 @@ static int trx_ctrl_cmd(struct trx_instance *trx, int critical,
 	int len, pending = 0;
 	va_list ap;
 
-	/*if (!transceiver_available && !!strcmp(cmd, "POWEROFF")) {
-		LOGP(DTRX, LOGL_ERROR, "CTRL ignored: No clock from "
-			"transceiver, please fix!\n");
+	if (trx->state == TRX_STATE_OFFLINE && !!strcmp(cmd, "ECHO")) {
+		LOGP(DTRX, LOGL_ERROR, "CTRL data ignored, "
+			"transceiver isn't ready\n");
 		return -EIO;
-	}*/
+	}
 
 	if (!llist_empty(&trx->trx_ctrl_list))
 		pending = 1;
@@ -271,11 +272,13 @@ static int trx_ctrl_cmd(struct trx_instance *trx, int critical,
 
 int trx_if_cmd_poweroff(struct trx_instance *trx)
 {
+	trx->state = TRX_STATE_OFF;
 	return trx_ctrl_cmd(trx, 1, "POWEROFF", "");
 }
 
 int trx_if_cmd_poweron(struct trx_instance *trx)
 {
+	trx->state = TRX_STATE_ON;
 	return trx_ctrl_cmd(trx, 1, "POWERON", "");
 }
 
@@ -373,6 +376,47 @@ int trx_if_cmd_txtune(struct trx_instance *trx, uint16_t arfcn)
 int trx_if_cmd_sync(struct trx_instance *trx)
 {
 	return trx_ctrl_cmd(trx, 1, "SYNC", "");
+}
+
+static void echo_success_cb(int resp, struct trx_instance *trx, void *data)
+{
+	LOGP(DTRX, LOGL_DEBUG, "Transceiver available\n");
+
+	if (trx->state == TRX_STATE_OFFLINE)
+		trx->state = TRX_STATE_OFF;
+
+	if (osmo_timer_pending(&trx->trx_echo_timer))
+		osmo_timer_del(&trx->trx_echo_timer);
+
+	trx->echo_ind = 1;
+}
+
+static void echo_fail_cb(void *data)
+{
+	struct trx_instance *trx = (struct trx_instance *) data;
+
+	trx_if_flush_ctrl(trx);
+	trx->state = TRX_STATE_OFFLINE;
+
+	// FIXME: Should we inform layer23?
+	LOGP(DTRX, LOGL_ERROR, "Transceiver offline\n");
+	app_handle_event(APP_EVENT_TRX_DISCONNECT);
+}
+
+int trx_if_cmd_echo(struct trx_instance *trx)
+{
+	LOGP(DTRX, LOGL_DEBUG, "Sending ECHO Request...\n");
+
+	// Start expire timer
+	trx->trx_echo_timer.data = trx;
+	trx->trx_echo_timer.cb = echo_fail_cb;
+	osmo_timer_schedule(&trx->trx_echo_timer, 6, 0);
+
+	// Set response (success) handler
+	trx_ctrl_set_resp_cb(trx, &echo_success_cb, NULL);
+	trx->echo_ind = 0;
+
+	return trx_ctrl_cmd(trx, 1, "ECHO", "");
 }
 
 int trx_ctrl_set_resp_cb(struct trx_instance *trx,
@@ -481,8 +525,7 @@ static int trx_ctrl_read_cb(struct osmo_fd *ofd, unsigned int what)
 	return 0;
 
 rsp_error:
-	// TODO: stop/freeze trxcon process
-	// bts_shutdown(l1h->trx->bts, "SIGINT");
+	app_handle_event(APP_EVENT_TRX_RESP_ERROR);
 	return -EIO;
 }
 
@@ -575,14 +618,18 @@ int trx_if_data(struct trx_instance *trx, uint8_t tn, uint32_t fn,
 	// Copy ubits {0,1}
 	memcpy(buf + 6, bits, 148);
 
-	// TODO: transceiver_available???
-	// We must be sure that we have clock,
-	// and we have sent all control data
-	/*if (transceiver_available && llist_empty(&l1h->trx_ctrl_list)) {
-		send(l1h->trx_ofd_data.fd, buf, 154, 0);
+	// We must be sure that transceiver is working
+	if (trx->state == TRX_STATE_ON && trx->echo_ind) {
+		// And that we have sent all control data
+		if (llist_empty(&trx->trx_ctrl_list)) {
+			send(trx->trx_ofd_data.fd, buf, 154, 0);
+		} else {
+			LOGP(DTRX, LOGL_DEBUG, "Ignoring TX data, "
+				"transceiver isn't ready yet\n");
+		}
 	} else {
-		LOGP(DTRX, LOGL_DEBUG, "Ignoring TX data, transceiver offline.\n");
-	}*/
+		LOGP(DTRX, LOGL_DEBUG, "Ignoring TX data, transceiver offline\n");
+	}
 
 	return 0;
 }
@@ -627,12 +674,20 @@ int trx_if_open(struct trx_instance **trx, const char *host, uint16_t port)
 	if (rc < 0)
 		goto error;
 
-	*trx = trx_new;
+	// Set default transceiver state
+	trx_new->state = TRX_STATE_OFFLINE;
+	trx_new->echo_ind = 0;
 
+	// Perform a simple availability test
+	LOGP(DTRX, LOGL_NOTICE, "Performing availability check...\n");
+	trx_if_cmd_echo(trx_new);
+
+	// Set external pointer
+	*trx = trx_new;
 	return 0;
 
 error:
-	LOGP(DTRX, LOGL_NOTICE, "Couldn't establish UDP connection\n");
+	LOGP(DTRX, LOGL_ERROR, "Couldn't establish UDP connection\n");
 	talloc_free(trx_new);
 	return rc;
 }
@@ -641,6 +696,9 @@ error:
 void trx_if_flush_ctrl(struct trx_instance *trx)
 {
 	struct trx_ctrl_msg *tcm;
+
+	if (osmo_timer_pending(&trx->trx_ctrl_timer))
+		osmo_timer_del(&trx->trx_ctrl_timer);
 
 	while (!llist_empty(&trx->trx_ctrl_list)) {
 		tcm = llist_entry(trx->trx_ctrl_list.next, struct trx_ctrl_msg, list);

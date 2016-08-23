@@ -31,11 +31,23 @@ struct trx_instance {
 	struct osmo_fd trx_ofd_data;
 
 	struct osmo_timer_list trx_ctrl_timer;
+	struct osmo_timer_list trx_echo_timer;
+
 	struct llist_head trx_ctrl_resp_cb_list;
 	struct llist_head trx_ctrl_list;
 
 	// This counter is used for unique command ID generation
 	unsigned int cmd_id_counter;
+
+	// TRX ECHO response indication
+	int echo_ind;
+
+	// TRX state machine
+	enum {
+		TRX_STATE_OFFLINE,
+		TRX_STATE_OFF,
+		TRX_STATE_ON
+	} state;
 };
 
 void trx_if_close(struct trx_instance *trx);
@@ -45,6 +57,7 @@ void trx_if_flush_ctrl(struct trx_instance *trx);
 int trx_ctrl_set_resp_cb(struct trx_instance *trx,
 	trx_ctrl_resp_cb_def *cb, void *data);
 
+int trx_if_cmd_echo(struct trx_instance *trx);
 int trx_if_cmd_poweron(struct trx_instance *trx);
 int trx_if_cmd_poweroff(struct trx_instance *trx);
 
